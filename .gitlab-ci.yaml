@@ -1,0 +1,65 @@
+# This file is a template, and might need editing before it works on your project.
+# You can copy and paste this template into a new `.gitlab-ci.yml` file.
+# You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
+#
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Bash.gitlab-ci.yml
+
+# See https://docs.gitlab.com/ee/ci/yaml/index.html for all available options
+
+# you can delete this line if you're not using Docker
+image: busybox:latest
+
+stages:
+  - build
+  - test
+  - deploy
+
+# Define anchors for common configurations
+.default-variables: &default-variables
+  variables:
+    DEFAULT_VAR1: "value1"
+    DEFAULT_VAR2: "value2"
+  script:
+    - echo "This is a common script"
+
+# Job definitions
+build-job:
+  stage: build
+  <<: *default-variables
+
+test-job:
+  stage: test
+  <<: *default-variables
+  script:
+    - echo "Testing the project"
+
+setup-kind-cluster:
+  stage: test
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - ls
+    - apk add --no-cache curl
+    - curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.17.0/kind-linux-amd64
+    - chmod +x ./kind
+    - mv ./kind /usr/local/bin/kind
+    - kind create cluster --config kind-config.yaml --name my-cluster
+    - curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x ./kubectl
+    - mv ./kubectl /usr/local/bin/kubectl
+    - kind get nodes --name my-cluster
+    - kubectl config get-contexts
+    - kind get kubeconfig --name "my-cluster" > ~/.kube/config
+    - sed -i -E -e 's/localhost|0\.0\.0\.0/docker/g' ~/.kube/config
+    - kubectl cluster-info
+
+
+deploy-job:
+  stage: deploy
+  <<: *default-variables
+  script:
+    - echo "Deploying the project"
